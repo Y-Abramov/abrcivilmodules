@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net48;net8.0-windows</TargetFrameworks>
+    <OutputType>Library</OutputType>
+    <AssemblyName>Abr.Civil.Modules</AssemblyName>
+    <RootNamespace>AbrCivil.Modules</RootNamespace>
+    <Version>1.0.0</Version>
+    <AbrUseAutodeskRefs>true</AbrUseAutodeskRefs>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Sdk\*.cs" LinkBase="Shared\Sdk" />
+    <Compile Include="..\Shared\Ribbon\*.cs" LinkBase="Shared\Ribbon" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="abr.ico" />
+    <None Include="icons\**\*.png" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="PackageContents.template.xml" />
+  </ItemGroup>
+
+</Project>
