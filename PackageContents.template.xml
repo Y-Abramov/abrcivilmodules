@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApplicationPackage SchemaVersion="1.0"
+                    AutodeskProduct="AutoCAD"
+                    ProductType="Application"
+                    Name="abr-civil-modules"
+                    AppVersion="{VERSION}"
+                    Description="ABR | CIVIL: библиотека модулей"
+                    Author="Yaroslav I. Abramov"
+                    ProductCode="{ef165814-6fc1-4fca-9ee9-ace6a9bd9820}"
+                    UpgradeCode="{3a49a687-1cf8-4402-b32e-e87272c6790d}">
+  <CompanyDetails Name="ABR" Url="https://abrmove.ru" />
+  <Components Description="Civil 3D 2024">
+    <RuntimeRequirements OS="Win64" Platform="Civil3D" SeriesMin="R24.3" SeriesMax="R24.3" />
+    <ComponentEntry AppName="abr-civil-modules" Version="{VERSION}" ModuleName="./Contents/2024/{ASSEMBLY}.dll"
+                    LoadOnAutoCADStartup="True" AppDescription="ABR | CIVIL" />
+  </Components>
+  <Components Description="Civil 3D 2026">
+    <RuntimeRequirements OS="Win64" Platform="Civil3D" SeriesMin="R25.1" SeriesMax="R25.1" />
+    <ComponentEntry AppName="abr-civil-modules" Version="{VERSION}" ModuleName="./Contents/2026/{ASSEMBLY}.dll"
+                    LoadOnAutoCADStartup="True" AppDescription="ABR | CIVIL" />
+  </Components>
+</ApplicationPackage>
