@@ -386,7 +386,173 @@ namespace AbrCivil.Setup
             return result;
         }
 
-        // Заглушка: полная реализация появляется в задаче "Шаг 3 мастера".
-        private void ShowPage3() { }
+        private readonly Dictionary<string, Label> _progressRows = new Dictionary<string, Label>();
+        private bool _installing;
+
+        private void ShowPage3()
+        {
+            var selected = Selected();
+
+            BuildPage3(selected);
+
+            _page1.Visible = false;
+            _page2.Visible = false;
+            _page3.Visible = true;
+
+            InstallAsync(selected);
+        }
+
+        private void BuildPage3(List<ModuleChoice> selected)
+        {
+            _page3.Controls.Clear();
+            _progressRows.Clear();
+
+            var title = new Label
+            {
+                Text = "Установка",
+                Font = new Font("Segoe UI", 13f, FontStyle.Bold),
+                AutoSize = true,
+                Location = new Point(24, 20)
+            };
+
+            _progressList.Location = new Point(24, 60);
+            _progressList.Size = new Size(510, 260);
+            _progressList.BackColor = CardBack;
+            _progressList.BorderStyle = BorderStyle.FixedSingle;
+            _progressList.FlowDirection = FlowDirection.TopDown;
+            _progressList.WrapContents = false;
+            _progressList.AutoScroll = true;
+            _progressList.Controls.Clear();
+
+            foreach (var choice in selected)
+            {
+                var row = new Panel { Size = new Size(480, 24), Margin = new Padding(6, 4, 0, 0) };
+
+                var name = new Label
+                {
+                    Text = choice.Entry.Title,
+                    AutoSize = false,
+                    Size = new Size(240, 20),
+                    Location = new Point(0, 2)
+                };
+                var state = new Label
+                {
+                    Text = "ожидание",
+                    ForeColor = TextMuted,
+                    AutoSize = false,
+                    Size = new Size(230, 20),
+                    Location = new Point(246, 2)
+                };
+
+                row.Controls.Add(name);
+                row.Controls.Add(state);
+                _progressList.Controls.Add(row);
+                _progressRows[choice.Entry.Name] = state;
+            }
+
+            _summary.Text = "";
+            _summary.AutoSize = false;
+            _summary.Size = new Size(510, 40);
+            _summary.Location = new Point(24, 330);
+
+            _btnSite = MakeButton("Открыть сайт", false);
+            _btnSite.Location = new Point(270, 390);
+            _btnSite.Enabled = false;
+            _btnSite.Click += (s, e) =>
+            {
+                try { Process.Start(AbrBrand.WebsiteUrl); } catch (Exception) { }
+            };
+
+            _btnClose = MakeButton("Закрыть", true);
+            _btnClose.Location = new Point(404, 390);
+            _btnClose.Enabled = false;
+            _btnClose.Click += (s, e) => Close();
+
+            _page3.Controls.Add(title);
+            _page3.Controls.Add(_progressList);
+            _page3.Controls.Add(_summary);
+            _page3.Controls.Add(_btnSite);
+            _page3.Controls.Add(_btnClose);
+        }
+
+        private void InstallAsync(List<ModuleChoice> selected)
+        {
+            _installing = true;
+            ControlBox = false;
+
+            var installer = new BundleInstaller(
+                AbrPaths.PluginsRoot, Path.Combine(AbrPaths.DataRoot, "tmp"), _downloader);
+
+            var thread = new Thread(() =>
+            {
+                int ok = 0;
+                var failures = new List<string>();
+
+                foreach (var choice in selected)
+                {
+                    SetRow(choice.Entry.Name, "скачивание...", TextMuted);
+                    try
+                    {
+                        // Отключённый бандл: возвращаем манифест на место, иначе Civil 3D его не увидит.
+                        if (choice.State == ModuleState.Disabled && choice.Installed != null)
+                            BundleInstaller.SetEnabled(choice.Installed.Directory, true);
+
+                        installer.Install(choice.Entry.Name, choice.Entry.BundleUrl, choice.Entry.Sha256);
+
+                        SetRow(choice.Entry.Name,
+                            _downloader.LastDownloadUsedMirror ? "готово (зеркало)" : "готово", Good);
+                        ok++;
+                    }
+                    catch (Exception ex)
+                    {
+                        SetRow(choice.Entry.Name, "ошибка: " + ShortError(ex), Bad);
+                        failures.Add(choice.Entry.Title);
+                    }
+                }
+
+                var total = selected.Count;
+                BeginInvoke((MethodInvoker)(() =>
+                {
+                    _installing = false;
+                    ControlBox = true;
+                    _btnClose.Enabled = true;
+                    _btnSite.Enabled = true;
+
+                    var text = "Установлено " + ok + " из " + total + ".";
+                    if (failures.Count > 0) text += " Не удалось: " + string.Join(", ", failures.ToArray()) + ".";
+                    if (ok > 0) text += "\r\nЗапустите Civil 3D - модули появятся на вкладке ленты «Модули».";
+
+                    _summary.ForeColor = failures.Count > 0 ? Bad : Good;
+                    _summary.Text = text;
+                }));
+            });
+            thread.IsBackground = true;
+            thread.Start();
+        }
+
+        private void SetRow(string moduleName, string text, Color color)
+        {
+            BeginInvoke((MethodInvoker)(() =>
+            {
+                Label row;
+                if (!_progressRows.TryGetValue(moduleName, out row)) return;
+                row.Text = text;
+                row.ForeColor = color;
+            }));
+        }
+
+        /// <summary>Первая строка сообщения: в окне нет места на многострочный текст исключения.</summary>
+        private static string ShortError(Exception ex)
+        {
+            var message = ex.Message ?? "неизвестная ошибка";
+            var line = message.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            return line.Length > 0 ? line[0] : message;
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (_installing) { e.Cancel = true; return; }
+            base.OnFormClosing(e);
+        }
     }
 }
