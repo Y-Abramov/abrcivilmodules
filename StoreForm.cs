@@ -460,7 +460,7 @@ namespace AbrCivil.Modules
             FetchDownloadCount(entry, downloads);
             y += 22;
 
-            string secondaryText = SecondaryText(state);
+            string secondaryText = SecondaryText(entry, state);
             if (secondaryText != null)
             {
                 var secondary = new LinkLabel
@@ -599,13 +599,23 @@ namespace AbrCivil.Modules
             }
         }
 
-        private static string SecondaryText(ModuleState state)
+        /// <summary>Каталожное имя самой Библиотеки модулей - её деактивация лишила бы
+        /// юзера единственного способа включить её обратно: ABRSTORE перестал бы
+        /// существовать после перезапуска, а отдельного модуля для реактивации нет.</summary>
+        private const string SelfModuleName = "abr-civil-modules";
+
+        private static bool IsSelf(ModuleEntry entry)
+        {
+            return string.Equals(entry.Name, SelfModuleName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string SecondaryText(ModuleEntry entry, ModuleState state)
         {
             switch (state)
             {
                 case ModuleState.Installed:
                 case ModuleState.UpdateAvailable:
-                    return "Отключить";
+                    return IsSelf(entry) ? null : "Отключить";
                 case ModuleState.Disabled:
                     return "Удалить";
                 default:
