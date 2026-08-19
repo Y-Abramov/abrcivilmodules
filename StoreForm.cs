@@ -17,8 +17,11 @@ namespace AbrCivil.Modules
         private static readonly Color PageBack   = ColorTranslator.FromHtml("#F5F7F9");
         private static readonly Color TextMuted  = ColorTranslator.FromHtml("#5B6770");
 
+        private const int CardWidth  = 400;
+        private const int ColumnWidth = CardWidth + 16;
+
         private readonly TabControl _tabs        = new TabControl();
-        private readonly FlowLayoutPanel _cards  = new FlowLayoutPanel();
+        private readonly TableLayoutPanel _cards = new TableLayoutPanel();
         private readonly Label _statusLeft       = new Label();
         private readonly Label _statusRight      = new Label();
         private readonly Panel _restartBar       = new Panel();
@@ -87,10 +90,19 @@ namespace AbrCivil.Modules
             status.Controls.Add(_statusLeft);
             status.Controls.Add(_statusRight);
 
+            // Фиксированная сетка 2 колонки: юзер не хочет, чтобы карточки "прыгали"
+            // (меняли число колонок) при изменении размера окна - в отличие от Robur-стора,
+            // где сетка сама сжималась до 1 колонки. Ширина колонок задана Absolute,
+            // не Percent: при нехватке места появляется горизонтальный скролл, карточки
+            // не растягиваются и не переливаются.
             _cards.Dock = DockStyle.Fill;
             _cards.AutoScroll = true;
             _cards.Padding = new Padding(12);
             _cards.BackColor = PageBack;
+            _cards.ColumnCount = 2;
+            _cards.GrowStyle = TableLayoutPanelGrowStyle.AddRows;
+            _cards.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, ColumnWidth));
+            _cards.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, ColumnWidth));
 
             var tabModules = new TabPage("Модули") { BackColor = PageBack };
             tabModules.Controls.Add(_cards);
@@ -132,15 +144,22 @@ namespace AbrCivil.Modules
         private void Reload()
         {
             _cards.Controls.Clear();
+            _cards.RowStyles.Clear();
+            _cards.RowCount = 0;
             Cursor = Cursors.WaitCursor;
             try
             {
                 var entries   = _catalog.Load();
                 var installed = InstalledScanner.Scan(AbrPaths.PluginsRoot);
 
+                int index = 0;
                 foreach (var entry in entries)
-                    _cards.Controls.Add(BuildCard(entry, ModuleStateResolver.Resolve(entry, installed, _hostYear),
-                                                  ModuleStateResolver.Find(installed, entry.Name)));
+                {
+                    var card = BuildCard(entry, ModuleStateResolver.Resolve(entry, installed, _hostYear),
+                                         ModuleStateResolver.Find(installed, entry.Name));
+                    _cards.Controls.Add(card, index % 2, index / 2);
+                    index++;
+                }
 
                 _statusLeft.Text = _catalog.LastLoadWasOffline
                     ? "Каталог недоступен, показан сохранённый список"
@@ -155,7 +174,13 @@ namespace AbrCivil.Modules
 
         private Control BuildCard(ModuleEntry entry, ModuleState state, InstalledBundle installed)
         {
-            var card = new Panel { Width = 400, BackColor = CardBack, Margin = new Padding(8) };
+            var card = new Panel
+            {
+                Width       = CardWidth,
+                BackColor   = CardBack,
+                Margin      = new Padding(8),
+                BorderStyle = BorderStyle.FixedSingle
+            };
             PopulateCard(card, entry, state, installed);
             return card;
         }
@@ -183,17 +208,27 @@ namespace AbrCivil.Modules
             });
             y += 24;
 
-            bool expandable = entry.Description.Length > 90;
+            // Порог сворачивания - от РЕАЛЬНОЙ высоты текста в боксе, а не число символов:
+            // у большинства описаний текст и так помещается в отведённые строки, символьный
+            // порог давал "Подробнее" там, где разворачивать было нечего.
+            const int descWidth = 372;
+            var lineHeight = TextRenderer.MeasureText("Ай", Font).Height;
+            int collapsedHeight = lineHeight * 3;
+
+            var fullSize = TextRenderer.MeasureText(entry.Description, Font,
+                new Size(descWidth, 0), TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
+
+            bool expandable = fullSize.Height > collapsedHeight + 2;
             bool expanded = expandable && _expanded.Contains(entry.Name);
-            int descHeight = expanded ? 76 : 40;
+            int descHeight = expandable && !expanded ? collapsedHeight : Math.Min(fullSize.Height, lineHeight * 8);
 
             card.Controls.Add(new Label
             {
                 Text = entry.Description,
                 ForeColor = TextMuted,
                 Location = new Point(14, y),
-                Size = new Size(372, descHeight),
-                AutoEllipsis = !expanded
+                Size = new Size(descWidth, descHeight),
+                AutoEllipsis = expandable && !expanded
             });
             y += descHeight;
 
