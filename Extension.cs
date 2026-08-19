@@ -43,8 +43,9 @@ namespace AbrCivil.Modules
 
             var panel = AbrRibbon.EnsurePanel(tab, "ABR_CIVIL_MODULES_PANEL", "Модули");
             panel.Source.Items.Add(AbrRibbon.MakeButton("Библиотека\nмодулей", "ABRSTORE", "abr_store"));
-            panel.Source.Items.Add(AbrRibbon.MakeButton("О модуле", "ABRABOUT", "abr_about"));
-            panel.Source.Items.Add(AbrRibbon.MakeButton("Сайт", "ABRSITE", "abr_website"));
+            panel.Source.Items.Add(AbrRibbon.MakeColumn(
+                AbrRibbon.MakeSmallButton("О модуле", "ABRABOUT", "abr_about"),
+                AbrRibbon.MakeSmallButton("Сайт", "ABRSITE", "abr_website")));
         }
 
         [CommandMethod("ABRSTORE")]

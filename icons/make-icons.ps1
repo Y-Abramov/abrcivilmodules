@@ -49,26 +49,23 @@ function Draw-AbrAbout($g, [int]$S, $neutral, $accent, [double]$stroke) {
 }
 
 function Draw-AbrStore($g, [int]$S, $neutral, $accent, [double]$stroke) {
-    # Коробка со стрелкой внутрь - библиотека модулей, откуда их устанавливают.
-    $penNeutral = New-Pen $neutral $stroke
+    # Облако в акцентной обводке - библиотека модулей тянется из сети.
     $penAccent = New-Pen $accent $stroke
 
-    # Корпус коробки.
-    $g.DrawLine($penNeutral, [float]($S * 0.16), [float]($S * 0.34), [float]($S * 0.50), [float]($S * 0.18))
-    $g.DrawLine($penNeutral, [float]($S * 0.50), [float]($S * 0.18), [float]($S * 0.84), [float]($S * 0.34))
-    $g.DrawLine($penNeutral, [float]($S * 0.16), [float]($S * 0.34), [float]($S * 0.16), [float]($S * 0.70))
-    $g.DrawLine($penNeutral, [float]($S * 0.84), [float]($S * 0.34), [float]($S * 0.84), [float]($S * 0.70))
-    $g.DrawLine($penNeutral, [float]($S * 0.16), [float]($S * 0.70), [float]($S * 0.50), [float]($S * 0.86))
-    $g.DrawLine($penNeutral, [float]($S * 0.84), [float]($S * 0.70), [float]($S * 0.50), [float]($S * 0.86))
-    $g.DrawLine($penNeutral, [float]($S * 0.50), [float]($S * 0.86), [float]($S * 0.50), [float]($S * 0.50))
-    $g.DrawLine($penNeutral, [float]($S * 0.16), [float]($S * 0.34), [float]($S * 0.50), [float]($S * 0.50))
-    $g.DrawLine($penNeutral, [float]($S * 0.84), [float]($S * 0.34), [float]($S * 0.50), [float]($S * 0.50))
+    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $path.AddArc([float]($S * 0.14), [float]($S * 0.32), [float]($S * 0.30), [float]($S * 0.30), 90, 180)
+    $path.AddArc([float]($S * 0.30), [float]($S * 0.16), [float]($S * 0.34), [float]($S * 0.34), 200, 160)
+    $path.AddArc([float]($S * 0.54), [float]($S * 0.30), [float]($S * 0.30), [float]($S * 0.30), 270, 140)
+    $path.CloseFigure()
+    $g.DrawPath($penAccent, $path)
+    $path.Dispose()
 
-    # Стрелка вниз внутрь коробки - установка.
-    $cap = New-Object System.Drawing.Drawing2D.AdjustableArrowCap([float]2.0, [float]2.0, $true)
-    $penAccent.CustomEndCap = $cap
+    # Стрелка вниз внутрь облака - установка.
+    $penNeutral = New-Pen $neutral ($stroke * 0.95)
+    $cap = New-Object System.Drawing.Drawing2D.AdjustableArrowCap([float]1.8, [float]1.8, $true)
+    $penNeutral.CustomEndCap = $cap
     $x = [float]($S * 0.5)
-    $g.DrawLine($penAccent, $x, [float]($S * 0.02), $x, [float]($S * 0.30))
+    $g.DrawLine($penNeutral, $x, [float]($S * 0.40), $x, [float]($S * 0.64))
     $cap.Dispose()
 
     $penAccent.Dispose(); $penNeutral.Dispose()
