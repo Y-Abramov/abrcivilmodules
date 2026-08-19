@@ -13,9 +13,11 @@ namespace AbrCivil.Modules
     {
         public void Initialize()
         {
-            // Только лёгкое: дочистка *.old и лента. Ни сети, ни диалогов.
+            // Только лёгкое напрямую: дочистка *.old и лента. Ни сети, ни диалогов -
+            // проверка обновлений уходит в фоновый поток (UpdateNotifier), Initialize её не ждёт.
             SafeCleanup();
             AbrRibbon.WhenReady(BuildRibbon);
+            UpdateNotifier.Start();
         }
 
         public void Terminate() { }
