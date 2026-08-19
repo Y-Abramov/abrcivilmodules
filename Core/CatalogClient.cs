@@ -14,9 +14,10 @@ namespace AbrCivil.Modules.Core
             "https://raw.githubusercontent.com/Y-Abramov/civil3d-modules/main/catalog.json";
 
         /// <summary>Зеркало на случай недоступности GitHub (тот же приём, что у Robur -
-        /// см. reference_module_repos_status/project_live_catalog_monorepo).</summary>
+        /// см. reference_module_repos_status/project_live_catalog_monorepo). Папка bundle
+        /// в уже существующем бакете Robur-линии (abrmove-modules), не отдельный бакет.</summary>
         public const string CatalogBackupUrl =
-            "https://storage.yandexcloud.net/abrmove-civil-modules/catalog.json";
+            "https://storage.yandexcloud.net/abrmove-modules/bundle/catalog.json";
 
         private readonly IFileDownloader _downloader;
 

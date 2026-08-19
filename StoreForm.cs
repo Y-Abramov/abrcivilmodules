@@ -20,11 +20,19 @@ namespace AbrCivil.Modules
         private const int CardWidth  = 400;
         private const int ColumnWidth = CardWidth + 16;
 
-        private readonly TabControl _tabs        = new TabControl();
         private readonly TableLayoutPanel _cards = new TableLayoutPanel();
         private readonly Label _statusLeft       = new Label();
         private readonly Label _statusRight      = new Label();
         private readonly Panel _restartBar       = new Panel();
+
+        private Panel _pageModules;
+        private Panel _pageNews;
+        private Panel _tabModulesBtn;
+        private Panel _tabNewsBtn;
+        private Label _tabModulesLbl;
+        private Label _tabNewsLbl;
+        private Panel _tabModulesUnderline;
+        private Panel _tabNewsUnderline;
 
         private readonly CatalogClient _catalog  = new CatalogClient(new HttpFileDownloader());
         private readonly BundleInstaller _installer =
@@ -104,27 +112,39 @@ namespace AbrCivil.Modules
             _cards.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, ColumnWidth));
             _cards.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, ColumnWidth));
 
-            var tabModules = new TabPage("Модули") { BackColor = PageBack };
-            tabModules.Controls.Add(_cards);
+            // Вкладки - свои (панель+подпись+полоска снизу), не TabControl: у родного
+            // компонента серый 3D-хром, который выбивался из плоского стиля Стора.
+            // Тот же приём, что в Robur-сторе (AbrModules/StoreDialog.cs MakeTab).
+            var tabStrip = new Panel { Dock = DockStyle.Top, Height = 34, BackColor = CardBack };
+            _tabModulesBtn = MakeTab("Модули",  out _tabModulesLbl, out _tabModulesUnderline);
+            _tabNewsBtn    = MakeTab("Новости", out _tabNewsLbl,    out _tabNewsUnderline);
+            _tabModulesBtn.Left = 12;
+            _tabNewsBtn.Left    = _tabModulesBtn.Right;
+            _tabModulesBtn.Click    += (s, e) => SwitchTab(true);
+            _tabModulesLbl.Click    += (s, e) => SwitchTab(true);
+            _tabNewsBtn.Click       += (s, e) => SwitchTab(false);
+            _tabNewsLbl.Click       += (s, e) => SwitchTab(false);
+            tabStrip.Controls.Add(_tabModulesBtn);
+            tabStrip.Controls.Add(_tabNewsBtn);
+            tabStrip.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = ColorTranslator.FromHtml("#E1E4E8") });
 
-            var tabNews = new TabPage("Новости") { BackColor = PageBack };
-            tabNews.Controls.Add(new Label
-            {
-                Text      = "Новости модулей ABR | CIVIL пока не подключены.",
-                Dock      = DockStyle.Top,
-                Height    = 40,
-                Padding   = new Padding(16, 16, 16, 0),
-                ForeColor = TextMuted
-            });
+            _pageModules = new Panel { Dock = DockStyle.Fill, BackColor = PageBack };
+            _pageModules.Controls.Add(_cards);
 
-            _tabs.Dock = DockStyle.Fill;
-            _tabs.TabPages.Add(tabModules);
-            _tabs.TabPages.Add(tabNews);
+            _pageNews = new Panel { Dock = DockStyle.Fill, BackColor = PageBack, Visible = false };
+            BuildNewsPage(_pageNews);
 
-            Controls.Add(_tabs);
+            var pages = new Panel { Dock = DockStyle.Fill };
+            pages.Controls.Add(_pageModules);
+            pages.Controls.Add(_pageNews);
+
+            Controls.Add(pages);
+            Controls.Add(tabStrip);
             Controls.Add(_restartBar);
             Controls.Add(toolbar);
             Controls.Add(status);
+
+            SwitchTab(true);
         }
 
         /// <summary>Родные кнопки Windows, без owner-draw: правило линейки.</summary>
@@ -139,6 +159,65 @@ namespace AbrCivil.Modules
                 b.FlatAppearance.BorderSize = 0;
             }
             return b;
+        }
+
+        /// <summary>Вкладка: панель с лейблом и 2px-полосой акцента снизу - тот же приём,
+        /// что в Robur-сторе (родной TabControl даёт серый 3D-хром, плоскому стилю не подходит).</summary>
+        private Panel MakeTab(string text, out Label lbl, out Panel underline)
+        {
+            var tab = new Panel { Width = 96, Height = 33, Top = 0, BackColor = CardBack, Cursor = Cursors.Hand };
+            lbl = new Label
+            {
+                Text      = text,
+                Dock      = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleCenter,
+                ForeColor = TextMuted,
+                Cursor    = Cursors.Hand
+            };
+            underline = new Panel { Dock = DockStyle.Bottom, Height = 2, BackColor = CardBack };
+            tab.Controls.Add(lbl);
+            tab.Controls.Add(underline);
+            return tab;
+        }
+
+        private void SwitchTab(bool modules)
+        {
+            _pageModules.Visible = modules;
+            _pageNews.Visible    = !modules;
+
+            _tabModulesLbl.ForeColor = modules ? Accent : TextMuted;
+            _tabModulesLbl.Font      = new Font(Font, modules ? FontStyle.Bold : FontStyle.Regular);
+            _tabModulesUnderline.BackColor = modules ? Accent : CardBack;
+
+            _tabNewsLbl.ForeColor = !modules ? Accent : TextMuted;
+            _tabNewsLbl.Font      = new Font(Font, !modules ? FontStyle.Bold : FontStyle.Regular);
+            _tabNewsUnderline.BackColor = !modules ? Accent : CardBack;
+        }
+
+        /// <summary>У линейки civil3d нет собственного новостного фида (в отличие от Robur,
+        /// где news.json уже отдаёт содержимое) - вопрос разграничения с новостями Robur
+        /// на общем abrmove.ru не решён. Вместо заглушки без действия - прямая ссылка
+        /// на новости сайта, тот же переход, что у кнопки «Инструкция» на карточке.</summary>
+        private void BuildNewsPage(Panel page)
+        {
+            var text = new Label
+            {
+                Text      = "Новости модулей ABR | CIVIL публикуются на сайте разработчика.",
+                Dock      = DockStyle.Top,
+                Height    = 48,
+                Padding   = new Padding(16, 20, 16, 0),
+                ForeColor = TextMuted
+            };
+            page.Controls.Add(text);
+
+            var link = MakeGhostButton("Новости на сайте");
+            link.Location = new Point(16, 68);
+            link.Click += (s, e) =>
+            {
+                try { Process.Start(new ProcessStartInfo(AbrBrand.WebsiteUrl + "/news/") { UseShellExecute = true }); }
+                catch (Exception) { }
+            };
+            page.Controls.Add(link);
         }
 
         private void Reload()
