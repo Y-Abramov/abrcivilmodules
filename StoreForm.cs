@@ -25,6 +25,8 @@ namespace AbrCivil.Modules
         private readonly Label _statusRight      = new Label();
         private readonly Panel _restartBar       = new Panel();
 
+        private readonly FlowLayoutPanel _newsList = new FlowLayoutPanel();
+
         private Panel _pageModules;
         private Panel _pageNews;
         private Panel _tabModulesBtn;
@@ -58,7 +60,7 @@ namespace AbrCivil.Modules
                 Autodesk.AutoCAD.ApplicationServices.Core.Application.Version);
 
             BuildLayout();
-            Shown += (s, e) => Reload();
+            Shown += (s, e) => { Reload(); LoadNews(); };
         }
 
         private void BuildLayout()
@@ -194,30 +196,136 @@ namespace AbrCivil.Modules
             _tabNewsUnderline.BackColor = !modules ? Accent : CardBack;
         }
 
-        /// <summary>У линейки civil3d нет собственного новостного фида (в отличие от Robur,
-        /// где news.json уже отдаёт содержимое) - вопрос разграничения с новостями Robur
-        /// на общем abrmove.ru не решён. Вместо заглушки без действия - прямая ссылка
-        /// на новости сайта, тот же переход, что у кнопки «Инструкция» на карточке.</summary>
+        /// <summary>Тот же фид, что читает линейка Robur (общий news.json на abrmove.ru) -
+        /// юзер явно решил не разграничивать новости по продукту, встраивается как есть.</summary>
         private void BuildNewsPage(Panel page)
         {
-            var text = new Label
+            _newsList.Dock = DockStyle.Fill;
+            _newsList.AutoScroll = true;
+            _newsList.WrapContents = false;
+            _newsList.FlowDirection = FlowDirection.TopDown;
+            _newsList.Padding = new Padding(12);
+            _newsList.BackColor = PageBack;
+            _newsList.Controls.Add(new Label
             {
-                Text      = "Новости модулей ABR | CIVIL публикуются на сайте разработчика.",
-                Dock      = DockStyle.Top,
-                Height    = 48,
-                Padding   = new Padding(16, 20, 16, 0),
-                ForeColor = TextMuted
-            };
-            page.Controls.Add(text);
+                Text = "Загрузка...", AutoSize = true, ForeColor = TextMuted, Margin = new Padding(6)
+            });
+            page.Controls.Add(_newsList);
+        }
 
-            var link = MakeGhostButton("Новости на сайте");
-            link.Location = new Point(16, 68);
-            link.Click += (s, e) =>
+        private void LoadNews()
+        {
+            var t = new Thread(() =>
             {
-                try { Process.Start(new ProcessStartInfo(AbrBrand.WebsiteUrl + "/news/") { UseShellExecute = true }); }
+                List<NewsItem> items;
+                try { items = NewsFeed.Fetch(new HttpFileDownloader()); }
+                catch (Exception) { items = null; }
+
+                try
+                {
+                    if (_newsList.IsDisposed) return;
+                    _newsList.Invoke((MethodInvoker)(() => RebuildNews(items)));
+                }
                 catch (Exception) { }
+            });
+            t.IsBackground = true;
+            t.Start();
+        }
+
+        private void RebuildNews(List<NewsItem> items)
+        {
+            _newsList.SuspendLayout();
+            _newsList.Controls.Clear();
+
+            if (items == null || items.Count == 0)
+            {
+                _newsList.Controls.Add(new Label
+                {
+                    Text      = items == null ? "Новости недоступны" : "Новостей пока нет",
+                    AutoSize  = true,
+                    ForeColor = TextMuted,
+                    Margin    = new Padding(6)
+                });
+                _newsList.ResumeLayout();
+                return;
+            }
+
+            foreach (var n in items)
+                _newsList.Controls.Add(CreateNewsCard(n));
+
+            _newsList.ResumeLayout();
+        }
+
+        private Control CreateNewsCard(NewsItem n)
+        {
+            const int width = 2 * ColumnWidth - 12;
+
+            var card = new Panel
+            {
+                Width = width,
+                BackColor = CardBack,
+                Margin = new Padding(4, 4, 4, 8),
+                BorderStyle = BorderStyle.FixedSingle
             };
-            page.Controls.Add(link);
+
+            var date = new Label
+            {
+                Text = n.DisplayDate,
+                Font = new Font("Consolas", 8f),
+                ForeColor = TextMuted,
+                Location = new Point(14, 10),
+                AutoSize = true
+            };
+            card.Controls.Add(date);
+
+            var title = new Label
+            {
+                Text = n.Title,
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                Location = new Point(14, 28),
+                Size = new Size(width - 28, 20),
+                AutoEllipsis = true
+            };
+            card.Controls.Add(title);
+
+            int y = 52;
+            if (!string.IsNullOrEmpty(n.Body))
+            {
+                var bodySize = TextRenderer.MeasureText(n.Body, Font,
+                    new Size(width - 28, 0), TextFormatFlags.WordBreak);
+                var body = new Label
+                {
+                    Text = n.Body,
+                    ForeColor = TextMuted,
+                    Location = new Point(14, y),
+                    Size = new Size(width - 28, bodySize.Height)
+                };
+                card.Controls.Add(body);
+                y += bodySize.Height + 8;
+            }
+
+            if (!string.IsNullOrEmpty(n.Url))
+            {
+                var link = new LinkLabel
+                {
+                    Text = "Подробнее →",
+                    Font = new Font("Segoe UI", 8.5f),
+                    LinkColor = Accent,
+                    AutoSize = true,
+                    Location = new Point(14, y)
+                };
+                var url = n.Url;
+                link.LinkClicked += (s, e) =>
+                {
+                    try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
+                    catch (Exception) { }
+                };
+                card.Controls.Add(link);
+                y += 20;
+            }
+
+            card.Height = y + 10;
+            return card;
         }
 
         private void Reload()
