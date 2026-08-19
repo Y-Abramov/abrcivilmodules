@@ -246,7 +246,147 @@ namespace AbrCivil.Setup
             RunChecks();
         }
 
-        // Заглушка: полная реализация появляется в задаче "Шаг 2 мастера".
-        private void ShowPage2() { }
+        private void ShowPage2()
+        {
+            var installed = InstalledScanner.Scan(AbrPaths.PluginsRoot);
+            _choices = SetupPlanner.Build(_catalog, installed, _env.HostYear);
+
+            BuildPage2();
+
+            _page1.Visible = false;
+            _page3.Visible = false;
+            _page2.Visible = true;
+        }
+
+        private void BuildPage2()
+        {
+            _page2.Controls.Clear();
+            _boxes.Clear();
+
+            var title = new Label
+            {
+                Text = "Выберите модули",
+                Font = new Font("Segoe UI", 13f, FontStyle.Bold),
+                AutoSize = true,
+                Location = new Point(24, 20)
+            };
+
+            _moduleList.Location = new Point(24, 60);
+            _moduleList.Size = new Size(510, 310);
+            _moduleList.BackColor = CardBack;
+            _moduleList.BorderStyle = BorderStyle.FixedSingle;
+            _moduleList.AutoScroll = true;
+            _moduleList.Controls.Clear();
+
+            int y = 8;
+            foreach (var choice in _choices)
+            {
+                var box = new CheckBox
+                {
+                    Text = choice.Entry.Title,
+                    Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                    Checked = choice.Checked,
+                    Enabled = !choice.Locked,
+                    AutoSize = false,
+                    Size = new Size(300, 20),
+                    Location = new Point(10, y)
+                };
+                box.CheckedChanged += (s, e) => UpdateInstallButton();
+
+                var status = new Label
+                {
+                    Text = choice.IsLibrary && choice.State == ModuleState.NotInstalled
+                        ? "обязателен"
+                        : choice.StatusText,
+                    ForeColor = choice.State == ModuleState.Incompatible ? Bad : TextMuted,
+                    TextAlign = ContentAlignment.MiddleRight,
+                    AutoSize = false,
+                    Size = new Size(170, 20),
+                    Location = new Point(316, y)
+                };
+
+                var description = new Label
+                {
+                    Text = choice.Entry.Description,
+                    ForeColor = TextMuted,
+                    Font = new Font("Segoe UI", 8.5f),
+                    AutoEllipsis = true,
+                    AutoSize = false,
+                    Size = new Size(470, 18),
+                    Location = new Point(30, y + 20)
+                };
+
+                _moduleList.Controls.Add(box);
+                _moduleList.Controls.Add(status);
+                _moduleList.Controls.Add(description);
+                _boxes[choice.Entry.Name] = box;
+
+                y += 48;
+            }
+
+            var btnAll = MakeButton("Все", false);
+            btnAll.Size = new Size(80, 28);
+            btnAll.Location = new Point(24, 390);
+            btnAll.Click += (s, e) => SetAll(true);
+
+            var btnNone = MakeButton("Ничего", false);
+            btnNone.Size = new Size(80, 28);
+            btnNone.Location = new Point(110, 390);
+            btnNone.Click += (s, e) => SetAll(false);
+
+            _btnBack = MakeButton("< Назад", false);
+            _btnBack.Location = new Point(270, 390);
+            _btnBack.Click += (s, e) =>
+            {
+                _page2.Visible = false;
+                _page1.Visible = true;
+            };
+
+            _btnInstall = MakeButton("Установить", true);
+            _btnInstall.Location = new Point(404, 390);
+            _btnInstall.Click += (s, e) => ShowPage3();
+
+            _page2.Controls.Add(title);
+            _page2.Controls.Add(_moduleList);
+            _page2.Controls.Add(btnAll);
+            _page2.Controls.Add(btnNone);
+            _page2.Controls.Add(_btnBack);
+            _page2.Controls.Add(_btnInstall);
+
+            UpdateInstallButton();
+        }
+
+        private void SetAll(bool value)
+        {
+            foreach (var choice in _choices)
+            {
+                CheckBox box;
+                if (!_boxes.TryGetValue(choice.Entry.Name, out box)) continue;
+                if (!box.Enabled) continue;   // библиотека и несовместимые не трогаются
+                box.Checked = value;
+            }
+            UpdateInstallButton();
+        }
+
+        private void UpdateInstallButton()
+        {
+            if (_btnInstall == null) return;
+            _btnInstall.Enabled = Selected().Count > 0;
+        }
+
+        private List<ModuleChoice> Selected()
+        {
+            var result = new List<ModuleChoice>();
+            foreach (var choice in _choices)
+            {
+                CheckBox box;
+                if (_boxes.TryGetValue(choice.Entry.Name, out box) && box.Checked)
+                    result.Add(choice);
+            }
+            return result;
+        }
+
+        // Заглушка: полная реализация появляется в задаче "Шаг 3 мастера".
+        private void ShowPage3() { }
     }
 }
