@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Утилита установки: отдельный exe, ссылок на AutoCAD.NET/Civil3D.NET нет.
+       Core линкуется исходниками из ..\Core - тот же движок, что у Стора внутри Civil 3D. -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>AbrCivilSetup</AssemblyName>
+    <RootNamespace>AbrCivil.Setup</RootNamespace>
+    <Version>1.0.0</Version>
+    <AbrUseAutodeskRefs>false</AbrUseAutodeskRefs>
+    <ApplicationIcon>..\abr.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Core\*.cs" LinkBase="Core" />
+    <Compile Include="..\..\Shared\Sdk\AbrIcon.cs" LinkBase="Shared" />
+    <Compile Include="..\..\Shared\Sdk\AbrBrand.cs" LinkBase="Shared" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\abr.ico" LogicalName="AbrCivil.Setup.abr.ico" />
+    <EmbeddedResource Include="catalog.json" LogicalName="AbrCivil.Setup.catalog.json" />
+  </ItemGroup>
+
+  <!-- Те же GAC-ссылки, что нужны Core на net48 (JSON, XML, zip), плюс Forms для мастера.
+       Общий ItemGroup из Directory.Build.props включается только при AbrUseAutodeskRefs=true. -->
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
+
+</Project>
