@@ -19,7 +19,16 @@ namespace AbrCivil.Modules.Core
             foreach (var dir in Directory.GetDirectories(pluginsRoot, "*.bundle"))
             {
                 var manifest = Path.Combine(dir, "PackageContents.xml");
-                if (!File.Exists(manifest)) continue;
+                bool disabled = false;
+
+                if (!File.Exists(manifest))
+                {
+                    // Отключённый модуль: манифест уведён в .disabled (BundleInstaller.SetEnabled),
+                    // Civil 3D его не находит и не грузит, но модуль остаётся «видимым» в Сторе.
+                    manifest = Path.Combine(dir, "PackageContents.xml.disabled");
+                    if (!File.Exists(manifest)) continue;
+                    disabled = true;
+                }
 
                 try
                 {
@@ -28,9 +37,10 @@ namespace AbrCivil.Modules.Core
 
                     result.Add(new InstalledBundle
                     {
-                        Name      = Attr(root, "Name"),
-                        Version   = Attr(root, "AppVersion"),
-                        Directory = dir
+                        Name       = Attr(root, "Name"),
+                        Version    = Attr(root, "AppVersion"),
+                        Directory  = dir,
+                        IsDisabled = disabled
                     });
                 }
                 catch (Exception)

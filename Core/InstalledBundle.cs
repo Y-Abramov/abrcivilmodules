@@ -6,5 +6,6 @@ namespace AbrCivil.Modules.Core
         public string Name = "";
         public string Version = "";
         public string Directory = "";
+        public bool IsDisabled;
     }
 }

@@ -141,6 +141,28 @@ namespace AbrCivil.Modules.Core
             }
         }
 
+        /// <summary>
+        /// Отключить/включить модуль без удаления файлов: манифест уводится в
+        /// PackageContents.xml.disabled и обратно. Civil 3D сканирует ApplicationPlugins
+        /// по наличию PackageContents.xml - без него бандл просто не поднимается при
+        /// следующем старте, настройки и данные модуля никуда не деваются.
+        /// В отличие от установки/обновления файл не загружен как сборка - блокировки
+        /// не бывает, но на всякий случай тот же паттерн MoveAside/CopyOver.
+        /// </summary>
+        public static void SetEnabled(string bundleDir, bool enabled)
+        {
+            var active   = Path.Combine(bundleDir, "PackageContents.xml");
+            var disabled = Path.Combine(bundleDir, "PackageContents.xml.disabled");
+
+            var from = enabled ? disabled : active;
+            var to   = enabled ? active : disabled;
+
+            if (!File.Exists(from)) return;
+            if (File.Exists(to)) LockedFileOps.MoveAside(to);
+
+            File.Move(from, to);
+        }
+
         public static string ComputeSha256(string file)
         {
             using (var sha = SHA256.Create())

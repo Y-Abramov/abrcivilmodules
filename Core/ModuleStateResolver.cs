@@ -9,7 +9,8 @@ namespace AbrCivil.Modules.Core
         Installed,
         UpdateAvailable,
         Incompatible,
-        NotInCatalog
+        NotInCatalog,
+        Disabled
     }
 
     internal static class ModuleStateResolver
@@ -23,6 +24,7 @@ namespace AbrCivil.Modules.Core
 
             var found = Find(installed, entry.Name);
             if (found == null) return ModuleState.NotInstalled;
+            if (found.IsDisabled) return ModuleState.Disabled;
 
             return VersionUtil.IsNewer(entry.Version, found.Version)
                 ? ModuleState.UpdateAvailable
