@@ -9,13 +9,13 @@
                     ProductCode="{ef165814-6fc1-4fca-9ee9-ace6a9bd9820}"
                     UpgradeCode="{3a49a687-1cf8-4402-b32e-e87272c6790d}">
   <CompanyDetails Name="ABR" Url="https://abrmove.ru" />
-  <Components Description="Civil 3D 2024">
-    <RuntimeRequirements OS="Win64" Platform="Civil3D" SeriesMin="R24.3" SeriesMax="R24.3" />
+  <Components Description="Civil 3D 2015-2024">
+    <RuntimeRequirements OS="Win64" Platform="Civil3D" SeriesMin="R20.0" SeriesMax="R24.3" />
     <ComponentEntry AppName="abr-civil-modules" Version="{VERSION}" ModuleName="./Contents/2024/{ASSEMBLY}.dll"
                     LoadOnAutoCADStartup="True" AppDescription="ABR | CIVIL" />
   </Components>
-  <Components Description="Civil 3D 2026">
-    <RuntimeRequirements OS="Win64" Platform="Civil3D" SeriesMin="R25.1" SeriesMax="R25.1" />
+  <Components Description="Civil 3D 2025+">
+    <RuntimeRequirements OS="Win64" Platform="Civil3D" SeriesMin="R25.0" />
     <ComponentEntry AppName="abr-civil-modules" Version="{VERSION}" ModuleName="./Contents/2026/{ASSEMBLY}.dll"
                     LoadOnAutoCADStartup="True" AppDescription="ABR | CIVIL" />
   </Components>

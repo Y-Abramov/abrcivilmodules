@@ -10,6 +10,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="setup\**" />
+    <None Remove="setup\**" />
+    <EmbeddedResource Remove="setup\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="..\Shared\Sdk\*.cs" LinkBase="Shared\Sdk" />
     <Compile Include="..\Shared\Ribbon\*.cs" LinkBase="Shared\Ribbon" />
   </ItemGroup>
