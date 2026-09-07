@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 using Abr.Civil.Sdk;
@@ -10,6 +11,9 @@ using AbrCivil.Modules.Core;
 
 namespace AbrCivil.Modules
 {
+    internal enum StoreTab { Modules, News }
+    internal enum ModuleViewMode { Cards, List }
+
     internal class StoreForm : Form
     {
         private static readonly Color Accent     = ColorTranslator.FromHtml("#0891B2");
@@ -26,6 +30,13 @@ namespace AbrCivil.Modules
         private readonly Panel _restartBar       = new Panel();
 
         private readonly FlowLayoutPanel _newsList = new FlowLayoutPanel();
+        private readonly FlowLayoutPanel _listRows = new FlowLayoutPanel();
+
+        private ModuleViewMode _viewMode;
+        private Button _btnViewCards;
+        private Button _btnViewList;
+        private List<ModuleEntry> _lastEntries = new List<ModuleEntry>();
+        private List<InstalledBundle> _lastInstalled = new List<InstalledBundle>();
 
         private Panel _pageModules;
         private Panel _pageNews;
@@ -41,13 +52,22 @@ namespace AbrCivil.Modules
             new BundleInstaller(AbrPaths.PluginsRoot, Path.Combine(AbrPaths.DataRoot, "tmp"), new HttpFileDownloader());
 
         private readonly int _hostYear;
+        private readonly StoreTab _startTab;
+        private readonly UnreadSnapshot _unread;
 
         /// <summary>Карточки, у которых юзер раскрыл полное описание - переживает Reload
         /// в пределах одного открытия окна (пересоздаётся при следующем открытии Стора).</summary>
         private readonly HashSet<string> _expanded = new HashSet<string>();
 
-        public StoreForm()
+        public StoreForm() : this(StoreTab.Modules, null) { }
+
+        /// <summary>startTab/unread - тост обновлений открывает окно сразу на нужной вкладке
+        /// с точками «Новый» на непрочитанных модулях (см. UpdateNotifier).</summary>
+        public StoreForm(StoreTab startTab, UnreadSnapshot unread)
         {
+            _startTab = startTab;
+            _unread   = unread;
+            _viewMode = LoadViewMode();
             Text            = "Библиотека модулей";   // префикс «ABR | » - только в AboutDialog
             ClientSize      = new Size(880, 620);
             StartPosition   = FormStartPosition.CenterParent;
@@ -75,6 +95,23 @@ namespace AbrCivil.Modules
             btnRefresh.Location = new Point(btnFromFile.Right + 8, 9);
             btnRefresh.Click += (s, e) => Reload();
             toolbar.Controls.Add(btnRefresh);
+
+            // Тумблер карточки/список - персист в abr_view_mode.txt, переключение
+            // без сетевого похода (RebuildModulesView строит из уже загруженных _lastEntries).
+            // Позиция считается явно (не Anchor): в момент добавления в toolbar.Controls
+            // панель ещё НЕ пристыкована к форме (Controls.Add(toolbar) - ниже по коду),
+            // её Width - дефолтные ~100px, а не итоговые 880 - Anchor="справа" запомнил бы
+            // расстояние от неверной ширины и после стыковки унёс бы кнопки за пределы окна.
+            _btnViewList = MakeGhostButton("☰", 36, 30);
+            _btnViewList.Click += (s, e) => SetViewMode(ModuleViewMode.List);
+            toolbar.Controls.Add(_btnViewList);
+
+            _btnViewCards = MakeGhostButton("▦", 36, 30);
+            _btnViewCards.Click += (s, e) => SetViewMode(ModuleViewMode.Cards);
+            toolbar.Controls.Add(_btnViewCards);
+
+            toolbar.Resize += (s, e) => RepositionViewToggle();
+            UpdateViewToggleButtons();
 
             _restartBar.Dock = DockStyle.Top;
             _restartBar.Height = 32;
@@ -130,8 +167,18 @@ namespace AbrCivil.Modules
             tabStrip.Controls.Add(_tabNewsBtn);
             tabStrip.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = ColorTranslator.FromHtml("#E1E4E8") });
 
+            _listRows.Dock = DockStyle.Fill;
+            _listRows.AutoScroll = true;
+            _listRows.WrapContents = false;
+            _listRows.FlowDirection = FlowDirection.TopDown;
+            _listRows.Padding = new Padding(12);
+            _listRows.BackColor = PageBack;
+            _listRows.Visible = false;
+            _listRows.Resize += (s, e) => ResizeListRows();
+
             _pageModules = new Panel { Dock = DockStyle.Fill, BackColor = PageBack };
             _pageModules.Controls.Add(_cards);
+            _pageModules.Controls.Add(_listRows);
 
             _pageNews = new Panel { Dock = DockStyle.Fill, BackColor = PageBack, Visible = false };
             BuildNewsPage(_pageNews);
@@ -146,7 +193,19 @@ namespace AbrCivil.Modules
             Controls.Add(toolbar);
             Controls.Add(status);
 
-            SwitchTab(true);
+            RepositionViewToggle();
+            SwitchTab(_startTab == StoreTab.Modules);
+        }
+
+        /// <summary>Пересчитывает позицию тумблеров карточки/список от ФАКТИЧЕСКОЙ
+        /// ширины toolbar - вызывается сразу после Controls.Add(toolbar) (когда Dock
+        /// уже растянул панель на всю форму) и на каждый toolbar.Resize.</summary>
+        private void RepositionViewToggle()
+        {
+            if (_btnViewList == null || _btnViewCards == null || _btnViewList.Parent == null) return;
+            int w = _btnViewList.Parent.ClientSize.Width;
+            _btnViewList.Location  = new Point(w - _btnViewList.Width - 12, 9);
+            _btnViewCards.Location = new Point(_btnViewList.Left - _btnViewCards.Width - 4, 9);
         }
 
         /// <summary>Родные кнопки Windows, без owner-draw: правило линейки.</summary>
@@ -330,23 +389,25 @@ namespace AbrCivil.Modules
 
         private void Reload()
         {
-            _cards.Controls.Clear();
-            _cards.RowStyles.Clear();
-            _cards.RowCount = 0;
             Cursor = Cursors.WaitCursor;
             try
             {
                 var entries   = _catalog.Load();
                 var installed = InstalledScanner.Scan(AbrPaths.PluginsRoot);
 
-                int index = 0;
-                foreach (var entry in entries)
-                {
-                    var card = BuildCard(entry, ModuleStateResolver.Resolve(entry, installed, _hostYear),
-                                         ModuleStateResolver.Find(installed, entry.Name));
-                    _cards.Controls.Add(card, index % 2, index / 2);
-                    index++;
-                }
+                // Обновления и непрочитанные новые модули - наверх (тот же приём, что в
+                // Robur-сторе), OrderBy стабилен - порядок внутри группы не ломается.
+                entries = entries
+                    .Select((entry, i) => new { entry, i, state = ModuleStateResolver.Resolve(entry, installed, _hostYear) })
+                    .OrderBy(x => SortRank(x.entry, x.state))
+                    .ThenBy(x => x.i)
+                    .Select(x => x.entry)
+                    .ToList();
+
+                _lastEntries   = entries;
+                _lastInstalled = installed;
+
+                RebuildModulesView();
 
                 _statusLeft.Text = _catalog.LastLoadWasOffline
                     ? "Каталог недоступен, показан сохранённый список"
@@ -356,6 +417,165 @@ namespace AbrCivil.Modules
             finally
             {
                 Cursor = Cursors.Default;
+            }
+        }
+
+        /// <summary>Перестраивает активное представление (карточки/список) из уже
+        /// загруженного каталога - вызывается и после Reload, и при простом переключении
+        /// вида (SetViewMode), без повторного похода в сеть.</summary>
+        private void RebuildModulesView()
+        {
+            bool cardsMode = _viewMode == ModuleViewMode.Cards;
+            _cards.Visible    = cardsMode;
+            _listRows.Visible = !cardsMode;
+
+            if (cardsMode)
+            {
+                _cards.Controls.Clear();
+                _cards.RowStyles.Clear();
+                _cards.RowCount = 0;
+
+                int index = 0;
+                foreach (var entry in _lastEntries)
+                {
+                    var card = BuildCard(entry, ModuleStateResolver.Resolve(entry, _lastInstalled, _hostYear),
+                                         ModuleStateResolver.Find(_lastInstalled, entry.Name));
+                    _cards.Controls.Add(card, index % 2, index / 2);
+                    index++;
+                }
+            }
+            else
+            {
+                _listRows.SuspendLayout();
+                _listRows.Controls.Clear();
+                foreach (var entry in _lastEntries)
+                {
+                    var row = BuildListRow(entry, ModuleStateResolver.Resolve(entry, _lastInstalled, _hostYear),
+                                            ModuleStateResolver.Find(_lastInstalled, entry.Name));
+                    _listRows.Controls.Add(row);
+                }
+                _listRows.ResumeLayout();
+            }
+        }
+
+        /// <summary>Компактная строка списка: заголовок+версия слева, статус-чип и
+        /// кнопка действия справа (тот же набор данных, что карточка, без описания).</summary>
+        private Control BuildListRow(ModuleEntry entry, ModuleState state, InstalledBundle installed)
+        {
+            bool isNew = state == ModuleState.NotInstalled &&
+                         _unread != null && _unread.ModuleNames.Contains(entry.Name);
+
+            var row = new Panel
+            {
+                Width       = ComputeListRowWidth(),
+                Height      = 44,
+                BackColor   = CardBack,
+                Margin      = new Padding(0, 0, 0, 1),
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            row.Controls.Add(new Label
+            {
+                Text = entry.Title,
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                Location = new Point(12, 5),
+                AutoSize = true
+            });
+
+            var verText = "Версия " + entry.Version + (installed == null ? "" : "   установлена " + installed.Version);
+            row.Controls.Add(new Label
+            {
+                Text = verText,
+                Font = new Font("Segoe UI", 8f),
+                ForeColor = TextMuted,
+                Location = new Point(12, 24),
+                AutoSize = true
+            });
+
+            var verWidth = TextRenderer.MeasureText(verText, new Font("Segoe UI", 8f)).Width;
+            row.Controls.Add(new Label
+            {
+                Text = StateChip(state, isNew),
+                ForeColor = ChipColor(state, isNew),
+                Font = new Font("Segoe UI", 8f, FontStyle.Bold),
+                Location = new Point(12 + verWidth + 16, 24),
+                AutoSize = true
+            });
+
+            var action = MakeButton(ActionText(state), true);
+            action.Size = new Size(130, 26);
+            action.Location = new Point(row.Width - action.Width - 12, 9);
+            action.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            action.Enabled = state != ModuleState.Incompatible;
+            action.Click += (s, e) => RunAction(entry, state, installed);
+            row.Controls.Add(action);
+
+            var moreVersions = new ContextMenuStrip();
+            moreVersions.Items.Add("Другие версии...", null, (s, e) => ShowVersionPicker(entry, installed));
+            row.ContextMenuStrip = moreVersions;
+
+            return row;
+        }
+
+        private int ComputeListRowWidth()
+        {
+            int avail = _listRows.ClientSize.Width - _listRows.Padding.Horizontal;
+            return Math.Max(320, avail);
+        }
+
+        private void ResizeListRows()
+        {
+            int w = ComputeListRowWidth();
+            foreach (Control c in _listRows.Controls)
+                c.Width = w;
+        }
+
+        private void SetViewMode(ModuleViewMode mode)
+        {
+            if (_viewMode == mode) return;
+            _viewMode = mode;
+            SaveViewMode(mode);
+            UpdateViewToggleButtons();
+            RebuildModulesView();
+        }
+
+        private void UpdateViewToggleButtons()
+        {
+            bool cards = _viewMode == ModuleViewMode.Cards;
+            _btnViewCards.BackColor = cards ? Accent : Color.White;
+            _btnViewCards.ForeColor = cards ? Color.White : Accent;
+            _btnViewList.BackColor  = !cards ? Accent : Color.White;
+            _btnViewList.ForeColor  = !cards ? Color.White : Accent;
+        }
+
+        private static string ViewModeFile
+        {
+            get { return Path.Combine(AbrPaths.DataRoot, "abr_view_mode.txt"); }
+        }
+
+        private static ModuleViewMode LoadViewMode()
+        {
+            try
+            {
+                if (File.Exists(ViewModeFile) &&
+                    string.Equals(File.ReadAllText(ViewModeFile).Trim(), "list", StringComparison.OrdinalIgnoreCase))
+                    return ModuleViewMode.List;
+            }
+            catch (Exception)
+            {
+            }
+            return ModuleViewMode.Cards;
+        }
+
+        private static void SaveViewMode(ModuleViewMode mode)
+        {
+            try
+            {
+                AbrPaths.EnsureDataRoot();
+                File.WriteAllText(ViewModeFile, mode == ModuleViewMode.List ? "list" : "cards");
+            }
+            catch (Exception)
+            {
             }
         }
 
@@ -438,11 +658,14 @@ namespace AbrCivil.Modules
                 y += 18;
             }
 
+            bool isNew = state == ModuleState.NotInstalled &&
+                         _unread != null && _unread.ModuleNames.Contains(entry.Name);
+
             y += 4;
             card.Controls.Add(new Label
             {
-                Text = StateChip(state),
-                ForeColor = ChipColor(state),
+                Text = StateChip(state, isNew),
+                ForeColor = ChipColor(state, isNew),
                 Location = new Point(14, y),
                 AutoSize = true
             });
@@ -511,6 +734,13 @@ namespace AbrCivil.Modules
             };
             b.FlatAppearance.BorderColor = Accent;
             b.FlatAppearance.BorderSize = 1;
+            return b;
+        }
+
+        private static Button MakeGhostButton(string text, int width, int height)
+        {
+            var b = MakeGhostButton(text);
+            b.Size = new Size(width, height);
             return b;
         }
 
@@ -648,7 +878,17 @@ namespace AbrCivil.Modules
             RunInstallerAction(() => BundleInstaller.SetEnabled(installed.Directory, false));
         }
 
-        private string StateChip(ModuleState state)
+        /// <summary>Ранг группы для сортировки: обновление → новый непрочитанный → остальное.</summary>
+        private int SortRank(ModuleEntry entry, ModuleState state)
+        {
+            if (state == ModuleState.UpdateAvailable) return 0;
+            if (state == ModuleState.NotInstalled && _unread != null && _unread.ModuleNames.Contains(entry.Name)) return 1;
+            return 2;
+        }
+
+        private static readonly Color NewChipColor = ColorTranslator.FromHtml("#B45309");
+
+        private string StateChip(ModuleState state, bool isNew)
         {
             switch (state)
             {
@@ -657,16 +897,17 @@ namespace AbrCivil.Modules
                 case ModuleState.Incompatible:    return "Несовместим с Civil 3D " + _hostYear;
                 case ModuleState.NotInCatalog:    return "Не в каталоге";
                 case ModuleState.Disabled:        return "Отключен";
-                default:                          return "Не установлен";
+                default:                          return isNew ? "Новый" : "Не установлен";
             }
         }
 
-        private Color ChipColor(ModuleState state)
+        private Color ChipColor(ModuleState state, bool isNew)
         {
             switch (state)
             {
                 case ModuleState.Incompatible: return Color.Firebrick;
                 case ModuleState.Disabled:     return TextMuted;
+                case ModuleState.NotInstalled: return isNew ? NewChipColor : Accent;
                 default:                       return Accent;
             }
         }

@@ -8,10 +8,11 @@ using AcApp = Autodesk.AutoCAD.ApplicationServices.Core.Application;
 namespace AbrCivil.Modules
 {
     /// <summary>
-    /// Фоновая проверка обновлений при каждом старте Civil 3D. Тост показывается,
-    /// пока есть обновления - не однократно на версию (тот же принцип, что в Robur).
-    /// «Не напоминать» глушит навсегда через NotifyState, обновления не отслеживаются
-    /// «прочитано/непрочитано» - только счётчик.
+    /// Фоновая проверка событий при каждом старте Civil 3D: обновления + новые модули +
+    /// новости. Тост показывается, пока есть события - обновления напоминают каждый
+    /// запуск, новости и «новые модули» метятся прочитанными ПРИ ПОКАЗЕ тоста (тот же
+    /// принцип, что в Robur - см. AbrModules/UpdateNotifier.cs). «Не напоминать» глушит
+    /// навсегда через NotifyState.
     /// </summary>
     internal static class UpdateNotifier
     {
@@ -49,17 +50,41 @@ namespace AbrCivil.Modules
             }
             if (modules == null || modules.Count == 0) return;
 
+            List<NewsItem> news = null;
+            try { news = NewsFeed.Fetch(new HttpFileDownloader()); }
+            catch (Exception) { }
+
             var installed = InstalledScanner.Scan(AbrPaths.PluginsRoot);
             int hostYear = SeriesDetector.YearFromAcadVersion(AcApp.Version);
+
+            NotifyState.EnsureSeeded(modules, news);
 
             int updates = 0;
             foreach (var m in modules)
                 if (ModuleStateResolver.Resolve(m, installed, hostYear) == ModuleState.UpdateAvailable)
                     updates++;
 
-            if (updates == 0) return;
+            var unread = NotifyState.GetUnread(modules, installed, news);
 
-            ShowToast("Обновления: " + updates);
+            int total = updates + unread.ModuleNames.Count + unread.NewsIds.Count;
+            if (total == 0) return;
+
+            // «Прочитано при показе» - метим ДО показа, снапшот несёт непрочитанное
+            // в StoreForm, чтобы чип «Новый» дожил до открытия окна.
+            NotifyState.MarkSeen(unread);
+
+            var message = BuildMessage(updates, unread.ModuleNames.Count, unread.NewsIds.Count);
+            var tab = unread.NewsIds.Count > 0 ? StoreTab.News : StoreTab.Modules;
+            ShowToast(message, tab, unread);
+        }
+
+        private static string BuildMessage(int updates, int newModules, int news)
+        {
+            var parts = new List<string>();
+            if (updates > 0)    parts.Add("Обновления: " + updates);
+            if (newModules > 0) parts.Add("Новые модули: " + newModules);
+            if (news > 0)       parts.Add("Новости: " + news);
+            return string.Join(" · ", parts);
         }
 
         /// <summary>
@@ -84,13 +109,13 @@ namespace AbrCivil.Modules
         }
 
         /// <summary>Тост на собственном STA-потоке со своим message loop - поток Civil 3D не нужен.</summary>
-        private static void ShowToast(string message)
+        private static void ShowToast(string message, StoreTab tab, UnreadSnapshot unread)
         {
             var t = new Thread(() =>
             {
                 try
                 {
-                    using (var form = new UpdateToastForm(message, OpenStore, NotifyState.Mute))
+                    using (var form = new UpdateToastForm(message, () => OpenStore(tab, unread), NotifyState.Mute))
                         Application.Run(form);
                 }
                 catch (Exception)
@@ -102,9 +127,9 @@ namespace AbrCivil.Modules
             t.Start();
         }
 
-        private static void OpenStore()
+        private static void OpenStore(StoreTab tab, UnreadSnapshot unread)
         {
-            using (var form = new StoreForm())
+            using (var form = new StoreForm(tab, unread))
                 form.ShowDialog();
         }
     }
