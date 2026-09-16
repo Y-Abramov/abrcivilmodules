@@ -18,6 +18,10 @@ namespace AbrCivil.Modules.Core
     internal class EnvironmentReport
     {
         public readonly List<int> Years = new List<int>();
+
+        /// <summary>Серии Civil 3D новее таблицы SeriesDetector ("R26.1"): год не известен, но продукт стоит.</summary>
+        public readonly List<string> UnknownSeries = new List<string>();
+
         public bool AcadRunning;
 
         /// <summary>Год, под который считается совместимость. 0 - Civil 3D не найден.</summary>
@@ -60,7 +64,8 @@ namespace AbrCivil.Modules.Core
 
                 var version = new Version(int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value));
                 var year = SeriesDetector.YearFromAcadVersion(version);
-                if (year == 0) continue;
+                var newer = year == 0 && SeriesDetector.IsNewerThanKnown(version);
+                if (year == 0 && !newer) continue;
 
                 var releasePath = AutoCadRoot + "\\" + release;
                 foreach (var product in _registry.GetSubKeyNames(releasePath))
@@ -69,12 +74,21 @@ namespace AbrCivil.Modules.Core
                     if (string.IsNullOrEmpty(name)) continue;
                     if (name.IndexOf("Civil", StringComparison.OrdinalIgnoreCase) < 0) continue;
 
-                    if (!report.Years.Contains(year)) report.Years.Add(year);
+                    if (newer)
+                    {
+                        var series = SeriesDetector.SeriesString(version);
+                        if (!report.UnknownSeries.Contains(series)) report.UnknownSeries.Add(series);
+                    }
+                    else if (!report.Years.Contains(year))
+                    {
+                        report.Years.Add(year);
+                    }
                     break;
                 }
             }
 
             report.Years.Sort();
+            report.UnknownSeries.Sort(StringComparer.OrdinalIgnoreCase);
             return report;
         }
     }

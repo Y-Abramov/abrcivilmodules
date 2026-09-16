@@ -1,11 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- AbrCivil.Tests - свой проект тестов внутри папки модуля, в сборку модуля не входит -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);AbrCivil.Tests\**</DefaultItemExcludes>
     <TargetFrameworks>net48;net8.0-windows</TargetFrameworks>
     <OutputType>Library</OutputType>
     <AssemblyName>Abr.Civil.Modules</AssemblyName>
     <RootNamespace>AbrCivil.Modules</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <AbrUseAutodeskRefs>true</AbrUseAutodeskRefs>
   </PropertyGroup>
 

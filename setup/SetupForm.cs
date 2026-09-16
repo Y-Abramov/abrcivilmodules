@@ -13,7 +13,7 @@ namespace AbrCivil.Setup
 {
     /// <summary>Мастер установки: три страницы в одном окне.
     /// Стиль 1:1 от StoreForm - акцент #0891B2, родные кнопки без owner-draw.</summary>
-    internal class SetupForm : Form
+    internal partial class SetupForm : Form
     {
         internal static readonly Color Accent    = ColorTranslator.FromHtml("#0891B2");
         internal static readonly Color PageBack  = ColorTranslator.FromHtml("#F5F7F9");
@@ -33,6 +33,7 @@ namespace AbrCivil.Setup
         private readonly Label _summary = new Label();
 
         private Button _btnNext, _btnBack, _btnInstall, _btnRecheck, _btnClose, _btnSite;
+        private Button _btnRequirements, _btnRemoveModules;
 
         private readonly SetupCatalogSource _catalogSource;
         private readonly MirrorFallbackDownloader _downloader =
@@ -59,6 +60,7 @@ namespace AbrCivil.Setup
                 _downloader, EmbeddedCatalogJson, Path.Combine(AbrPaths.DataRoot, "setup"));
 
             BuildPage1();
+            Controls.Add(_page4);
             Controls.Add(_page3);
             Controls.Add(_page2);
             Controls.Add(_page1);
@@ -121,6 +123,20 @@ namespace AbrCivil.Setup
             _btnRecheck.Location = new Point(24, 400);
             _btnRecheck.Click += (s, e) => RunChecks();
 
+            _btnRequirements = MakeButton("Требования", false);
+            _btnRequirements.Size = new Size(100, 30);
+            _btnRequirements.Location = new Point(160, 400);
+            _btnRequirements.Click += (s, e) =>
+            {
+                using (var form = new RequirementsForm())
+                    form.ShowDialog(this);
+            };
+
+            _btnRemoveModules = MakeButton("Удалить модули", false);
+            _btnRemoveModules.Location = new Point(268, 400);
+            _btnRemoveModules.Enabled = false;
+            _btnRemoveModules.Click += (s, e) => ShowRemovalPage();
+
             _btnNext = MakeButton("Далее >", true);
             _btnNext.Location = new Point(404, 400);
             _btnNext.Enabled = false;
@@ -130,6 +146,8 @@ namespace AbrCivil.Setup
             _page1.Controls.Add(subtitle);
             _page1.Controls.Add(_checks);
             _page1.Controls.Add(_btnRecheck);
+            _page1.Controls.Add(_btnRequirements);
+            _page1.Controls.Add(_btnRemoveModules);
             _page1.Controls.Add(_btnNext);
         }
 
@@ -175,13 +193,24 @@ namespace AbrCivil.Setup
             _checks.Controls.Clear();
             _btnNext.Enabled = false;
             _btnRecheck.Enabled = false;
+            _btnRemoveModules.Enabled = false;
+
+            foreach (var check in SystemRequirements.Evaluate(ReadSystemInfo()))
+                AddCheck(check.Text, check.Level == CheckLevel.Ok ? Good : Warn);
 
             _env = new Civil3DDetector(new RegistryProbe(), RegistryProbe.IsAcadRunning).Detect();
             _shadows = ShadowScanner.Find(ShadowScanner.ProgramDataPluginsRoot);
 
+            UpdateRemoveModulesButton();
+
             if (_env.Years.Count > 0)
                 AddCheck("Найден Civil 3D " + string.Join(", ", _env.Years.ConvertAll(y => y.ToString()).ToArray()), Good);
-            else
+
+            if (_env.UnknownSeries.Count > 0)
+                AddCheck("Найден Civil 3D серии новее известных (" + string.Join(", ", _env.UnknownSeries.ToArray())
+                         + ") - установка разрешена, работа не проверялась", Warn);
+
+            if (_env.Years.Count == 0 && _env.UnknownSeries.Count == 0)
                 AddCheck("Civil 3D не найден. Установка возможна, модули появятся после его установки.", Warn);
 
             if (_env.AcadRunning)
@@ -197,6 +226,31 @@ namespace AbrCivil.Setup
             LoadCatalogAsync();
         }
 
+        /// <summary>Диск профиля пользователя: туда ставятся модули и растёт кэш.</summary>
+        private static SystemInfo ReadSystemInfo()
+        {
+            var drive = "";
+            long free = -1;
+            try
+            {
+                var root = Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+                free = new DriveInfo(root).AvailableFreeSpace;
+                drive = root.TrimEnd('\\');
+            }
+            catch (Exception)
+            {
+                // Диск не прочитался - строку места не выводим (FreeBytes = -1), остальные проверки идут.
+            }
+
+            return SystemRequirements.Read(new RegistryProbe(), Environment.Is64BitOperatingSystem, drive, free);
+        }
+
+        private void UpdateRemoveModulesButton()
+        {
+            var removable = RemovalPlanner.Build(InstalledScanner.Scan(AbrPaths.PluginsRoot), _catalog);
+            _btnRemoveModules.Enabled = !_env.AcadRunning && removable.Count > 0;
+        }
+
         private void LoadCatalogAsync()
         {
             var thread = new Thread(() =>
@@ -207,6 +261,7 @@ namespace AbrCivil.Setup
                 BeginInvoke((MethodInvoker)(() =>
                 {
                     _catalog = loaded;
+                    UpdateRemoveModulesButton();
 
                     // Последняя строка - заглушка «Загрузка каталога...», заменяем результатом.
                     _checks.Controls.RemoveAt(_checks.Controls.Count - 1);
@@ -216,6 +271,11 @@ namespace AbrCivil.Setup
                     else
                         AddCheck(origin + ": модулей " + loaded.Count,
                                  _catalogSource.Origin == CatalogOrigin.Live ? Good : Warn);
+
+                    var library = loaded.Find(m =>
+                        string.Equals(m.Name, SetupPlanner.LibraryName, StringComparison.OrdinalIgnoreCase));
+                    var note = SystemRequirements.CompatibilityNote(_env.HostYear, library);
+                    if (note != null) AddCheck(note, Warn);
 
                     _btnRecheck.Enabled = true;
                     _btnNext.Enabled = !_env.AcadRunning && loaded.Count > 0;
@@ -227,6 +287,12 @@ namespace AbrCivil.Setup
 
         /// <summary>Папка ProgramData админская: перезапускаем сами себя с повышением.</summary>
         private void CleanShadows()
+        {
+            if (TryCleanShadows())
+                RunChecks();
+        }
+
+        private bool TryCleanShadows()
         {
             try
             {
@@ -242,8 +308,9 @@ namespace AbrCivil.Setup
             {
                 MessageBox.Show(this, "Не удалось удалить старые копии:\r\n" + ex.Message,
                     "Установка модулей", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
             }
-            RunChecks();
+            return true;
         }
 
         private void ShowPage2()
@@ -254,6 +321,7 @@ namespace AbrCivil.Setup
             BuildPage2();
 
             _page1.Visible = false;
+            _page4.Visible = false;
             _page3.Visible = false;
             _page2.Visible = true;
         }
@@ -397,6 +465,7 @@ namespace AbrCivil.Setup
 
             _page1.Visible = false;
             _page2.Visible = false;
+            _page4.Visible = false;
             _page3.Visible = true;
 
             InstallAsync(selected);
@@ -551,7 +620,7 @@ namespace AbrCivil.Setup
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            if (_installing) { e.Cancel = true; return; }
+            if (_installing || _removing) { e.Cancel = true; return; }
             base.OnFormClosing(e);
         }
     }

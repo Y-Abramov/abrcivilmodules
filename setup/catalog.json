@@ -3,12 +3,12 @@
     {
       "name": "abr-civil-modules",
       "title": "Библиотека модулей",
-      "version": "1.0.0",
+      "version": "1.2.0",
       "description": "Каталог модулей ABR | CIVIL: установка, обновление и удаление без прав администратора.",
-      "bundle_url": "https://github.com/Y-Abramov/abrcivilmodules/releases/download/v1.0.0/AbrCivilModules-1.0.0.zip",
-      "bundle_sha256": "5C2101DDCD0368DEC96F61B5BA3AC148767928E2831B23D530D3186BDD57CB28",
+      "bundle_url": "https://github.com/Y-Abramov/abrcivilmodules/releases/download/v1.2.0/AbrCivilModules-1.2.0.zip",
+      "bundle_sha256": "3221ACA640FF6AA821E0A53BE3FA2E0056D178D53B07F9371473EB554C355401",
       "help_url": "https://abrmove.ru/modules/abr-civil-modules/",
-      "compatibility": ["2021", "2024", "2025", "2026"]
+      "compatibility": ["2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024", "2025", "2026"]
     },
     {
       "name": "AbrLispManager",
@@ -16,9 +16,9 @@
       "version": "1.0.0",
       "description": "Библиотека LISP-программ: категории, поиск, описания, запуск в один клик и автозагрузка в каждый чертёж.",
       "bundle_url": "https://github.com/Y-Abramov/abrlispmanager/releases/download/v1.0.0/AbrLispManager-1.0.0.zip",
-      "bundle_sha256": "F53CA2325A58BF1B386C97647E601B86807B4647C2DDB3F1C2CDB75CA90D2EF4",
+      "bundle_sha256": "0BFD1EA904EB108C67BEF44A419DCCCA74FE8BF45F8652F2E08B23CD184F2577",
       "help_url": "https://abrmove.ru/modules/abr-lisp-manager/",
-      "compatibility": ["2021", "2024", "2025", "2026"]
+      "compatibility": ["2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024", "2025", "2026"]
     },
     {
       "name": "AbrPlanStrip",
@@ -26,9 +26,9 @@
       "version": "1.0.0",
       "description": "Спрямление ситуационного плана трассы для полосы над сеткой продольного профиля.",
       "bundle_url": "https://github.com/Y-Abramov/abrplanstrip/releases/download/v1.0.0/AbrPlanStrip-1.0.0.zip",
-      "bundle_sha256": "2BB0199D11E5E78371494AF06FAE465F1E00620940447895CC85E82FA7FE437D",
+      "bundle_sha256": "081A65D96505E06828FCF8D773E0D553DAB552C4CF92141331FDAB7F0AF7C1A4",
       "help_url": "https://abrmove.ru/modules/abr-plan-strip/",
-      "compatibility": ["2021", "2024", "2025", "2026"]
+      "compatibility": ["2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024", "2025", "2026"]
     },
     {
       "name": "AbrCartogram",
@@ -36,9 +36,9 @@
       "version": "1.0.0",
       "description": "Построение и оформление плана земляных масс по ГОСТ 21.508-2020 с расчётом объёмов по двум поверхностям.",
       "bundle_url": "https://github.com/Y-Abramov/abrcartogram/releases/download/v1.0.0/AbrCartogram-1.0.0.zip",
-      "bundle_sha256": "5907FF88ABB0ED18903D0C9EF0409099FCE7DA9D59D92670A36EDE6DBF07A45F",
+      "bundle_sha256": "FD73118F4042D606A388FB15EDA1B5E3B242E16CDFD14CB5FE4184A8259C8C06",
       "help_url": "https://abrmove.ru/modules/abr-cartogram/",
-      "compatibility": ["2021", "2024", "2025", "2026"]
+      "compatibility": ["2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024", "2025", "2026"]
     },
     {
       "name": "AbrVehiclePassage",
@@ -46,9 +46,39 @@
       "version": "1.0.0",
       "description": "Проверка проезда расчётного транспортного средства: коридоры следа колёс и габарита кузова.",
       "bundle_url": "https://github.com/Y-Abramov/abrvehiclepassage/releases/download/v1.0.0/AbrVehiclePassage-1.0.0.zip",
-      "bundle_sha256": "BBDC0B71197641714602E7A7351504C5C23B7751467CBE0D5E50345B7302E359",
+      "bundle_sha256": "C4E6C2C0774B532B249FEEE14595551DBCBC3D05465D42729FB61A9611A20E7A",
       "help_url": "https://abrmove.ru/modules/abr-vehicle-passage/",
-      "compatibility": ["2021", "2024", "2025", "2026"]
+      "compatibility": ["2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024", "2025", "2026"]
+    },
+    {
+      "name": "AbrBasemap",
+      "title": "Диспетчер карт",
+      "version": "1.0.0",
+      "description": "Тайловые карты как растровая подложка чертежа: загрузка области, ресемплинг в систему координат чертежа, вставка одним растром.",
+      "bundle_url": "https://github.com/Y-Abramov/abrbasemap/releases/download/v1.0.0/AbrBasemap-1.0.0.zip",
+      "bundle_sha256": "610E3298B87289344C71DF91269022474322CC3F4AD8D5132A10722A74F497CE",
+      "help_url": "https://abrmove.ru/modules/abr-basemap/",
+      "compatibility": ["2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024", "2025", "2026"]
+    },
+    {
+      "name": "AbrDemLoader",
+      "title": "Загрузка рельефа",
+      "version": "1.0.0",
+      "description": "Рельеф из открытых данных как поверхность Civil 3D: выбор области в чертеже, загрузка DEM, построение поверхности в системе координат чертежа.",
+      "bundle_url": "https://github.com/Y-Abramov/abrdemloader/releases/download/v1.0.0/AbrDemLoader-1.0.0.zip",
+      "bundle_sha256": "5492579068AC625A67673243071EC84F0CDAC1FF682CE499269849A2B4372E30",
+      "help_url": "https://abrmove.ru/modules/abr-dem-loader/",
+      "compatibility": ["2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024", "2025", "2026"]
+    },
+    {
+      "name": "AbrPaving",
+      "title": "Мощение",
+      "version": "1.0.0",
+      "description": "Раскладка тротуарной плитки по контуру: схемы мощения, цветовые узоры, ведомость по СП 508.1325800.2022.",
+      "bundle_url": "https://github.com/Y-Abramov/abrpaving/releases/download/v1.0.0/AbrPaving-1.0.0.zip",
+      "bundle_sha256": "AE00754FAEE191700FC409B7B6A5B682472CB5357105C6FA98DC14694422BA31",
+      "help_url": "https://abrmove.ru/modules/abr-paving/",
+      "compatibility": ["2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024", "2025", "2026"]
     }
   ]
 }

@@ -19,7 +19,7 @@ namespace AbrCivil.Modules.Core
         {
             if (entry == null) return ModuleState.NotInCatalog;
 
-            if (entry.Compatibility.Count > 0 && !entry.Compatibility.Contains(hostYear.ToString()))
+            if (!CompatibilityRange.Allows(entry.Compatibility, hostYear))
                 return ModuleState.Incompatible;
 
             var found = Find(installed, entry.Name);
